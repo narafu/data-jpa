@@ -73,4 +73,59 @@ class MemberJpaRepositoryTest {
         Assertions.assertEquals(deletedCount, 0);
     }
 
+    @Test
+    void findByUsernameAndAgeGreaterThen() {
+
+        Member m1 = new Member("AAA", 10);
+        Member m2 = new Member("AAA", 20);
+
+        memberJpaRepository.save(m1);
+        memberJpaRepository.save(m2);
+
+        List<Member> result = memberJpaRepository.findByUsernameAndAgeGreaterThan("AAA", 15);
+
+        Assertions.assertEquals(result.get(0).getUsername(), "AAA");
+        Assertions.assertEquals(result.get(0).getAge(), 20);
+        Assertions.assertEquals(result.size(), 1);
+    }
+
+    @Test
+    void testNamedQuery() {
+        Member m1 = new Member("AAA", 10);
+        Member m2 = new Member("BBB", 20);
+
+        memberJpaRepository.save(m1);
+        memberJpaRepository.save(m2);
+
+        List<Member> result = memberJpaRepository.findByUsername("AAA");
+        Member findMember = result.get(0);
+        Assertions.assertEquals(findMember, m1);
+    }
+
+    @Test
+    void paging() {
+
+        // given
+        memberJpaRepository.save(new Member("member1", 10));
+        memberJpaRepository.save(new Member("member2", 10));
+        memberJpaRepository.save(new Member("member3", 10));
+        memberJpaRepository.save(new Member("member4", 10));
+        memberJpaRepository.save(new Member("member5", 10));
+
+        int age = 10;
+        int offset = 0;
+        int limit = 3;
+
+        // when
+        List<Member> members = memberJpaRepository.findByPage(age, offset, limit);
+        long totalCount = memberJpaRepository.totalCount(age);
+
+        System.out.println("members = " + members);
+        System.out.println("totalCount = " + totalCount);
+
+        // then
+        Assertions.assertEquals(members.size(), 3);
+        Assertions.assertEquals(totalCount, 5);
+    }
+
 }
