@@ -10,6 +10,10 @@ import javax.persistence.*;
 // JPA는 기본생성자를 필요로 한다. public은 너무 개방적, private은 읽지 못함. protected부터 읽음.
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @ToString(of = {"id", "username", "age"})
+@NamedQuery(
+        name = "Member.findByUsername"
+        , query = "select m from Member m where m.username = :username"
+)
 public class Member {
 
     @Id
@@ -33,6 +37,11 @@ public class Member {
         if (team != null) {
             changeTeam(team);
         }
+    }
+
+    public Member(String username, int age) {
+        this.username = username;
+        this.age = age;
     }
 
     public void changeTeam(Team team) {
