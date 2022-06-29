@@ -12,6 +12,8 @@ import study.datajpa.dto.MemberDto;
 import study.datajpa.entity.Member;
 import study.datajpa.entity.Team;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -24,6 +26,11 @@ class MemberRepositoryTest {
     MemberRepository memberRepository;
     @Autowired
     TeamRepository teamRepository;
+    @PersistenceContext
+    EntityManager entityManager;
+
+    @Autowired
+    MemberQueryRepository memberQueryRepository;
 
     @Test
     public void testMember() {
@@ -226,5 +233,116 @@ class MemberRepositoryTest {
         Assertions.assertTrue(page.isFirst());
         Assertions.assertTrue(page.hasNext());
 
+    }
+
+    @Test
+    void bulkUpdate() {
+
+        // given
+        memberRepository.save(new Member("member1", 10));
+        memberRepository.save(new Member("member2", 19));
+        memberRepository.save(new Member("member3", 20));
+        memberRepository.save(new Member("member4", 21));
+        memberRepository.save(new Member("member5", 40));
+
+        // when
+        int resultCount = memberRepository.bulkAgePlus(20);
+
+        Member member5 = null;
+        member5 = memberRepository.findMemberByUsername("member5");
+        System.out.println(member5);
+
+        /** 벌크 연산 이후에는 영속성 컨텍스트를 날려야 한다.
+         *
+         * entityManager.clear();
+         * 또는
+         * @Modifying(clearAutomatically = true) */
+//        entityManager.flush();
+//        entityManager.clear();
+
+        member5 = memberRepository.findMemberByUsername("member5");
+        System.out.println(member5);
+
+        // then
+        Assertions.assertEquals(resultCount, 3);
+
+    }
+
+    @Test
+    public void findMemberLazy() {
+        Team teamA = new Team("teamA");
+        Team teamB = new Team("teamB");
+        teamRepository.save(teamA);
+        teamRepository.save(teamB);
+
+        Member member1 = new Member("member1", 10, teamA);
+        Member member2 = new Member("member2", 10, teamB);
+        memberRepository.save(member1);
+        memberRepository.save(member2);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        List<Member> members = memberRepository.findAll(); // @EntityGraph(attributePaths = {"team"})
+//        List<Member> members = memberRepository.findMemberFetchJoin();
+
+        /** N + 1 문제 -> fetch join으로 해결
+         *
+         * member를 조회할 때, 지연로딩 설정 때문에
+         * member 조회할 때는 team을 프록시 객체로만 받아온다.
+         *
+         * 그리고, team이 사용될 때 team을 조회하는데,
+         * 아래 반복문이 n번 반복할 때마다, team을 조회하는 퀴리가 n번 실행된다.
+         *
+         * -> fetch join으로 해결한다.
+         * -> @EntityGraph(attributePaths = {"team"})
+         *
+         * */
+
+        for (Member member : members) {
+            System.out.println("member = " + member.getUsername());
+            System.out.println("member.teamClass = " + member.getTeam().getClass());
+            System.out.println("member.team = " + member.getTeam().getName());
+        }
+    }
+
+    @Test
+    void queryHint() {
+
+        // given
+        Member member1 = new Member("member1", 10);
+        memberRepository.save(member1);
+        entityManager.flush(); // -> 쿼리 실행
+        entityManager.clear(); // -> 영속성 컨텍스트 clear (캐시 날리는 것과 같은 개념)
+
+        // when
+        Member findMember = memberRepository.findById(member1.getId()).get();
+        findMember.setUsername("member2"); // 변경 감지 기능으로 인해 update 된다. 쿼리는 flush() 할 때 실행한다.
+        entityManager.flush();
+        entityManager.clear();
+
+        Member hintsMember = memberRepository.findReadOnlyByUsername("member2");
+        hintsMember.setUsername("member3");
+        entityManager.flush();
+
+    }
+
+    @Test
+    void lock() {
+
+        // given
+        Member member1 = new Member("member1", 10);
+        memberRepository.save(member1);
+        entityManager.flush();
+        entityManager.clear();
+
+        // when
+        List<Member> result = memberRepository.findLockByUsername("member1");
+
+    }
+
+    @Test
+    public void callCustom() {
+        List<Member> result = memberRepository.findMemberCustom();
     }
 }
